@@ -4,6 +4,7 @@ set -eu
 check_mode=false
 identity=""
 
+# Parse arguments
 while [ $# -gt 0 ]; do
   case "$1" in
   --check)
@@ -41,11 +42,13 @@ for age_file in "$@"; do
     exit 1
   fi
 
+  # Detect armored format
   is_armored=false
   if head -n1 "$age_file" | grep -q '^-----BEGIN AGE ENCRYPTED FILE-----$'; then
     is_armored=true
   fi
 
+  # Extract fingerprints from age file header
   actual_fp=$(mktemp)
   trap 'rm -f "$actual_fp"' EXIT
 
@@ -55,6 +58,7 @@ for age_file in "$@"; do
   fi
   echo "$age_binary" | grep -ao '^-> ssh-ed25519 [^ ]*' | cut -d' ' -f3 | sort >"$actual_fp"
 
+  # Compare recipient counts first
   expected_count=$(wc -l <"$recipients_file")
   actual_count=$(wc -l <"$actual_fp")
 
@@ -62,7 +66,9 @@ for age_file in "$@"; do
   if [ "$expected_count" != "$actual_count" ]; then
     mismatch=true
   else
+    # Check each expected fingerprint exists in actual
     while IFS= read -r pubkey_line; do
+      # Compute fingerprint: base64_no_padding(first_4_bytes(sha256(base64_decode(field2))))
       fp=$(echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | xxd -r -p | base64 | tr -d '=')
       if ! grep -qx "$fp" "$actual_fp"; then
         mismatch=true
@@ -82,6 +88,7 @@ for age_file in "$@"; do
     exit 1
   fi
 
+  # Rekey: decrypt and re-encrypt with new recipients
   echo "Rekeying: $age_file"
 
   tmpfile=$(umask 077 && mktemp)
