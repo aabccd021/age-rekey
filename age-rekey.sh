@@ -7,23 +7,27 @@ if [ "${1:-}" = "-i" ]; then
   shift 2
 fi
 
-if [ $# -eq 0 ]; then
-  echo "Usage: age-rekey [-i identity] <file.age>..." >&2
+dir="${1:-.}"
+
+# Collect all .age files from directory
+age_files=$(mktemp)
+for f in "$dir"/*.age; do
+  [ -f "$f" ] && echo "$f" >>"$age_files"
+done
+
+if [ ! -s "$age_files" ]; then
+  echo "No .age files found in $dir" >&2
+  rm -f "$age_files"
   exit 1
 fi
 
 expected_fp=$(mktemp)
 actual_fp=$(mktemp)
 plain_secret=$(umask 077 && mktemp)
-trap 'rm -f "$expected_fp" "$actual_fp" "$plain_secret"' EXIT
+trap 'rm -f "$age_files" "$expected_fp" "$actual_fp" "$plain_secret"' EXIT
 
-for age_file in "$@"; do
+while IFS= read -r age_file; do
   recipients_file="${age_file}.recipients.txt"
-
-  if [ ! -f "$recipients_file" ]; then
-    echo "Error: Recipients file not found: $recipients_file" >&2
-    exit 1
-  fi
 
   # Detect armored format
   is_armored=false
@@ -65,4 +69,4 @@ for age_file in "$@"; do
     armor_flag="-a"
   fi
   age -e $armor_flag -R "$recipients_file" -o "$age_file" "$plain_secret"
-done
+done <"$age_files"
