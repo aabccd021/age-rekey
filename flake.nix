@@ -88,6 +88,13 @@
             pkgs.openssh
           ];
         } (builtins.readFile ./test-rekey-armor.sh);
+        test-check-different-key = pkgs.runCommand "test-check-different-key" {
+          nativeBuildInputs = [
+            packages.default
+            pkgs.age
+            pkgs.openssh
+          ];
+        } (builtins.readFile ./test-check-different-key.sh);
       };
 
     in
