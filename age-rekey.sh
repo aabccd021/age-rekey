@@ -27,9 +27,8 @@ for age_file in "$dir"/*.age; do
   # Compute expected fingerprints from recipients file
   # fingerprint = base64_no_padding(first_4_bytes(sha256(base64_decode(field2))))
   while IFS= read -r pubkey_line; do
-    hex=$(echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8)
-    # shellcheck disable=SC2001
-    printf '%b' "$(echo "$hex" | sed 's/../\\x&/g')" | base64 | tr -d '='
+    hex=$(echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | sed 's/../\\x&/g')
+    printf '%b' "$hex" | base64 | tr -d '='
   done <"$recipients_file" | sort >"$expected_fp"
 
   # Extract actual fingerprints from age file header
