@@ -9,24 +9,13 @@ fi
 
 dir="${1:-.}"
 
-# Collect all .age files from directory
-age_files=$(mktemp)
-for f in "$dir"/*.age; do
-  [ -f "$f" ] && echo "$f" >>"$age_files"
-done
-
-if [ ! -s "$age_files" ]; then
-  echo "No .age files found in $dir" >&2
-  rm -f "$age_files"
-  exit 1
-fi
-
 expected_fp=$(mktemp)
 actual_fp=$(mktemp)
 plain_secret=$(umask 077 && mktemp)
-trap 'rm -f "$age_files" "$expected_fp" "$actual_fp" "$plain_secret"' EXIT
+trap 'rm -f "$expected_fp" "$actual_fp" "$plain_secret"' EXIT
 
-while IFS= read -r age_file; do
+for age_file in "$dir"/*.age; do
+  [ -f "$age_file" ] || continue
   recipients_file="${age_file}.recipients.txt"
 
   # Detect armored format
@@ -69,4 +58,4 @@ while IFS= read -r age_file; do
     armor_flag="-a"
   fi
   age -e $armor_flag -R "$recipients_file" -o "$age_file" "$plain_secret"
-done <"$age_files"
+done
