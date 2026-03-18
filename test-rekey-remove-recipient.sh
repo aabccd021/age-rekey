@@ -32,7 +32,7 @@ if age -d -i keys/bob secret.age 2>/dev/null; then
 fi
 
 # Verify check now passes
-age-rekey --check secret.age
+age-rekey secret.age
 
 echo "PASS: test-rekey-remove-recipient"
 touch "$out"

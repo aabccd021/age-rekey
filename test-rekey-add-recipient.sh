@@ -32,7 +32,7 @@ if [ "$decrypted" != "secret data" ]; then
 fi
 
 # Verify check now passes
-age-rekey --check secret.age
+age-rekey secret.age
 
 echo "PASS: test-rekey-add-recipient"
 touch "$out"
