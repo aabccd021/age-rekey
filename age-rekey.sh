@@ -34,6 +34,11 @@ if [ $# -eq 0 ]; then
   exit 1
 fi
 
+expected_fp=$(mktemp)
+actual_fp=$(mktemp)
+tmpfile=$(umask 077 && mktemp)
+trap 'rm -f "$expected_fp" "$actual_fp" "$tmpfile"' EXIT
+
 for age_file in "$@"; do
   recipients_file="${age_file}.recipients.txt"
 
@@ -47,10 +52,6 @@ for age_file in "$@"; do
   if head -n1 "$age_file" | grep -q '^-----BEGIN AGE ENCRYPTED FILE-----$'; then
     is_armored=true
   fi
-
-  expected_fp=$(mktemp)
-  actual_fp=$(mktemp)
-  trap 'rm -f "$expected_fp" "$actual_fp"' EXIT
 
   # Compute expected fingerprints from recipients file
   # fingerprint = base64_no_padding(first_4_bytes(sha256(base64_decode(field2))))
@@ -66,8 +67,7 @@ for age_file in "$@"; do
   echo "$age_binary" | grep -ao '^-> ssh-ed25519 [^ ]*' | cut -d' ' -f3 | sort >"$actual_fp"
 
   if diff -q "$expected_fp" "$actual_fp" >/dev/null; then
-    echo "OK: $age_file"
-    rm -f "$expected_fp" "$actual_fp"
+    echo "OK: $age_file" >&2
     continue
   fi
 
@@ -77,10 +77,7 @@ for age_file in "$@"; do
   fi
 
   # Rekey: decrypt and re-encrypt with new recipients
-  echo "Rekeying: $age_file"
-
-  tmpfile=$(umask 077 && mktemp)
-  trap 'rm -f "$expected_fp" "$actual_fp" "$tmpfile"' EXIT
+  echo "Rekeying: $age_file" >&2
 
   age -d -i "$identity" "$age_file" >"$tmpfile"
 
@@ -89,6 +86,4 @@ for age_file in "$@"; do
     armor_flag="-a"
   fi
   age -e $armor_flag -R "$recipients_file" -o "$age_file" "$tmpfile"
-
-  rm -f "$expected_fp" "$actual_fp" "$tmpfile"
 done
