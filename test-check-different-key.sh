@@ -13,7 +13,7 @@ age -e -R encrypt.txt -o secret.age plain.txt
 
 cat keys/alice.pub keys/charlie.pub >secret.age.recipients.txt
 
-if age-rekey secret.age; then
+if age-rekey; then
   echo "FAIL: Expected non-zero exit code" >&2
   exit 1
 fi

@@ -21,7 +21,7 @@ fi
 cat keys/alice.pub keys/bob.pub >secret.age.recipients.txt
 
 # Run rekey
-age-rekey -i keys/alice secret.age
+age-rekey -i keys/alice
 
 # Verify output is still armored
 if ! head -n1 secret.age | grep -q '^-----BEGIN AGE ENCRYPTED FILE-----$'; then

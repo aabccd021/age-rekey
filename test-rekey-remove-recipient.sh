@@ -16,7 +16,7 @@ age -e -R both.txt -o secret.age plain.txt
 cp keys/alice.pub secret.age.recipients.txt
 
 # Run rekey (not check mode) - use alice's private key to decrypt
-age-rekey -i keys/alice secret.age
+age-rekey -i keys/alice
 
 # Verify alice can still decrypt
 decrypted=$(age -d -i keys/alice secret.age)
@@ -32,7 +32,7 @@ if age -d -i keys/bob secret.age 2>/dev/null; then
 fi
 
 # Verify check now passes
-age-rekey secret.age
+age-rekey
 
 echo "PASS: test-rekey-remove-recipient"
 touch "$out"

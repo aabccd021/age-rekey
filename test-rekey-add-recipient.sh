@@ -15,7 +15,7 @@ age -e -R keys/alice.pub -o secret.age plain.txt
 cat keys/alice.pub keys/bob.pub >secret.age.recipients.txt
 
 # Run rekey (not check mode) - use alice's private key to decrypt
-age-rekey -i keys/alice secret.age
+age-rekey -i keys/alice
 
 # Verify bob can now decrypt
 decrypted=$(age -d -i keys/bob secret.age)
@@ -32,7 +32,7 @@ if [ "$decrypted" != "secret data" ]; then
 fi
 
 # Verify check now passes
-age-rekey secret.age
+age-rekey
 
 echo "PASS: test-rekey-add-recipient"
 touch "$out"

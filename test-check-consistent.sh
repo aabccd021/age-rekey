@@ -15,7 +15,7 @@ echo "secret data" >plain.txt
 age -e -R secret.age.recipients.txt -o secret.age plain.txt
 
 # Run check - should succeed
-age-rekey secret.age
+age-rekey
 
 echo "PASS: test-check-consistent"
 touch "$out"

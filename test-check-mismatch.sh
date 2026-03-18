@@ -15,7 +15,7 @@ age -e -R keys/alice.pub -o secret.age plain.txt
 cat keys/alice.pub keys/bob.pub >secret.age.recipients.txt
 
 # Run check - should fail
-if age-rekey secret.age; then
+if age-rekey; then
   echo "FAIL: Expected non-zero exit code" >&2
   exit 1
 fi
