@@ -55,11 +55,11 @@ for age_file in "$@"; do
     echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | xxd -r -p | base64 | tr -d '='
   done <"$recipients_file" | sort >"$expected_file"
 
+  age_binary=$(cat "$age_file")
   if [ "$is_armored" = true ]; then
-    sed '1d;$d' "$age_file" | base64 -d
-  else
-    cat "$age_file"
-  fi | grep -ao '^-> ssh-ed25519 [^ ]*' | cut -d' ' -f3 | sort >"$actual_file"
+    age_binary=$(echo "$age_binary" | sed '1d;$d' | base64 -d)
+  fi
+  echo "$age_binary" | grep -ao '^-> ssh-ed25519 [^ ]*' | cut -d' ' -f3 | sort >"$actual_file"
 
   if diff -q "$expected_file" "$actual_file" >/dev/null; then
     echo "OK: $age_file"
