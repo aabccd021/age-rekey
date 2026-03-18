@@ -48,38 +48,26 @@ for age_file in "$@"; do
     is_armored=true
   fi
 
-  # Extract fingerprints from age file header
+  expected_fp=$(mktemp)
   actual_fp=$(mktemp)
-  trap 'rm -f "$actual_fp"' EXIT
+  trap 'rm -f "$expected_fp" "$actual_fp"' EXIT
 
+  # Compute expected fingerprints from recipients file
+  # fingerprint = base64_no_padding(first_4_bytes(sha256(base64_decode(field2))))
+  while IFS= read -r pubkey_line; do
+    echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | xxd -r -p | base64 | tr -d '='
+  done <"$recipients_file" | sort >"$expected_fp"
+
+  # Extract actual fingerprints from age file header
   age_binary=$(cat "$age_file")
   if [ "$is_armored" = true ]; then
     age_binary=$(echo "$age_binary" | sed '1d;$d' | base64 -d)
   fi
   echo "$age_binary" | grep -ao '^-> ssh-ed25519 [^ ]*' | cut -d' ' -f3 | sort >"$actual_fp"
 
-  # Compare recipient counts first
-  expected_count=$(wc -l <"$recipients_file")
-  actual_count=$(wc -l <"$actual_fp")
-
-  mismatch=false
-  if [ "$expected_count" != "$actual_count" ]; then
-    mismatch=true
-  else
-    # Check each expected fingerprint exists in actual
-    while IFS= read -r pubkey_line; do
-      # Compute fingerprint: base64_no_padding(first_4_bytes(sha256(base64_decode(field2))))
-      fp=$(echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | xxd -r -p | base64 | tr -d '=')
-      if ! grep -qx "$fp" "$actual_fp"; then
-        mismatch=true
-        break
-      fi
-    done <"$recipients_file"
-  fi
-
-  if [ "$mismatch" = false ]; then
+  if diff -q "$expected_fp" "$actual_fp" >/dev/null; then
     echo "OK: $age_file"
-    rm -f "$actual_fp"
+    rm -f "$expected_fp" "$actual_fp"
     continue
   fi
 
@@ -92,7 +80,7 @@ for age_file in "$@"; do
   echo "Rekeying: $age_file"
 
   tmpfile=$(umask 077 && mktemp)
-  trap 'rm -f "$actual_fp" "$tmpfile"' EXIT
+  trap 'rm -f "$expected_fp" "$actual_fp" "$tmpfile"' EXIT
 
   age -d -i "$identity" "$age_file" >"$tmpfile"
 
@@ -102,5 +90,5 @@ for age_file in "$@"; do
   fi
   age -e $armor_flag -R "$recipients_file" -o "$age_file" "$tmpfile"
 
-  rm -f "$actual_fp" "$tmpfile"
+  rm -f "$expected_fp" "$actual_fp" "$tmpfile"
 done
