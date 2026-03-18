@@ -11,6 +11,23 @@
     }:
     let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      lib = nixpkgs.lib;
+
+      linkFarmAll =
+        flake: outputs:
+        let
+          toEntries =
+            outputName:
+            let
+              output = flake.${outputName}.x86_64-linux;
+              asAttrset = if lib.isDerivation output then { default = output; } else output;
+            in
+            lib.mapAttrsToList (name: drv: {
+              name = "${outputName}-${name}";
+              path = drv;
+            }) asAttrset;
+        in
+        pkgs.linkFarm "all" (lib.concatMap toEntries outputs);
 
       treefmtEval = treefmt-nix.lib.evalModule pkgs {
         programs.deadnix.enable = true;
@@ -30,24 +47,13 @@
         formatting = treefmtEval.config.build.check self;
       };
 
-      checks = {
-        all = pkgs.linkFarm "all" (
-          nixpkgs.lib.mapAttrsToList (name: drv: {
-            name = "packages-${name}";
-            path = drv;
-          }) packages
-          ++ [
-            {
-              name = "formatter-treefmt";
-              path = formatter;
-            }
-          ]
-        );
-      };
     in
     {
       packages.x86_64-linux = packages;
-      checks.x86_64-linux = checks;
       formatter.x86_64-linux = formatter;
+      checks.x86_64-linux.all = linkFarmAll self [
+        "packages"
+        "formatter"
+      ];
     };
 }
