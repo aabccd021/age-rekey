@@ -46,37 +46,38 @@ for age_file in "$@"; do
     is_armored=true
   fi
 
-  expected_sorted=""
+  expected_file=$(mktemp)
+  actual_file=$(mktemp)
+  trap 'rm -f "$expected_file" "$actual_file"' EXIT
+
   while IFS= read -r pubkey_line || [ -n "$pubkey_line" ]; do
     [ -z "$pubkey_line" ] && continue
-    fp=$(echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | xxd -r -p | base64 | tr -d '=')
-    expected_sorted="$expected_sorted
-$fp"
-  done <"$recipients_file"
-  expected_sorted=$(echo "$expected_sorted" | tail -n +2 | sort)
+    echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | xxd -r -p | base64 | tr -d '='
+  done <"$recipients_file" | sort >"$expected_file"
 
   if [ "$is_armored" = true ]; then
-    actual_sorted=$(sed '1d;$d' "$age_file" | base64 -d | grep -ao '^-> ssh-ed25519 [^ ]*' | cut -d' ' -f3 | sort)
+    sed '1d;$d' "$age_file" | base64 -d
   else
-    actual_sorted=$(grep -ao '^-> ssh-ed25519 [^ ]*' "$age_file" | cut -d' ' -f3 | sort)
-  fi
+    cat "$age_file"
+  fi | grep -ao '^-> ssh-ed25519 [^ ]*' | cut -d' ' -f3 | sort >"$actual_file"
 
-  if [ "$expected_sorted" = "$actual_sorted" ]; then
+  if diff -q "$expected_file" "$actual_file" >/dev/null; then
     echo "OK: $age_file"
+    rm -f "$expected_file" "$actual_file"
     continue
   fi
 
   if [ "$check_mode" = true ]; then
     echo "MISMATCH: $age_file" >&2
-    echo "  Expected: $(echo "$expected_sorted" | tr '\n' ' ')" >&2
-    echo "  Actual:   $(echo "$actual_sorted" | tr '\n' ' ')" >&2
+    echo "  Expected: $(tr '\n' ' ' <"$expected_file")" >&2
+    echo "  Actual:   $(tr '\n' ' ' <"$actual_file")" >&2
     exit 1
   fi
 
   echo "Rekeying: $age_file"
 
   tmpfile=$(umask 077 && mktemp)
-  trap 'rm -f "$tmpfile"' EXIT
+  trap 'rm -f "$expected_file" "$actual_file" "$tmpfile"' EXIT
 
   age -d -i "$identity" "$age_file" >"$tmpfile"
 
@@ -86,5 +87,5 @@ $fp"
   fi
   age -e $armor_flag -R "$recipients_file" -o "$age_file" "$tmpfile"
 
-  rm -f "$tmpfile"
+  rm -f "$expected_file" "$actual_file" "$tmpfile"
 done
