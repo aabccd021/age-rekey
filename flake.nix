@@ -10,24 +10,29 @@
       ...
     }:
     let
-      pkgs = nixpkgs.legacyPackages.x86_64-linux;
       lib = nixpkgs.lib;
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
 
       linkFarmAll =
-        flake: outputs:
-        let
-          toEntries =
-            outputName:
-            let
-              output = flake.${outputName}.x86_64-linux;
-              asAttrset = if lib.isDerivation output then { default = output; } else output;
-            in
+        system: flake:
+        lib.pipe flake [
+          (lib.filterAttrs (
+            name: output:
+            !lib.elem name [ "checks" ]
+            && output ? ${system}
+            && builtins.isAttrs output.${system}
+            && !(output.${system} ? type)
+          ))
+          (lib.mapAttrsToList (
+            outputName: output:
             lib.mapAttrsToList (name: drv: {
               name = "${outputName}-${name}";
               path = drv;
-            }) asAttrset;
-        in
-        pkgs.linkFarm "all" (lib.concatMap toEntries outputs);
+            }) output.${system}
+          ))
+          lib.concatLists
+          (pkgs.linkFarm "all")
+        ];
 
       treefmtEval = treefmt-nix.lib.evalModule pkgs {
         programs.deadnix.enable = true;
@@ -35,8 +40,6 @@
         programs.shfmt.enable = true;
         programs.shellcheck.enable = true;
       };
-
-      formatter = treefmtEval.config.build.wrapper;
 
       packages = {
         default = pkgs.writeShellApplication {
@@ -50,10 +53,7 @@
     in
     {
       packages.x86_64-linux = packages;
-      formatter.x86_64-linux = formatter;
-      checks.x86_64-linux.all = linkFarmAll self [
-        "packages"
-        "formatter"
-      ];
+      formatter.x86_64-linux = treefmtEval.config.build.wrapper;
+      checks.x86_64-linux.all = linkFarmAll "x86_64-linux" self;
     };
 }
