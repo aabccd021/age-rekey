@@ -46,9 +46,8 @@
           name = "age-rekey";
           runtimeInputs = with pkgs; [
             age
-            coreutils # base64, sha256sum, cut, head, tr, mktemp
-            gnugrep # grep
-            unixtools.xxd # xxd for hex conversion
+            coreutils # base64, sha256sum, cut, head, tr, mktemp, diff
+            gnused # sed
           ];
           text = builtins.readFile ./age-rekey.sh;
         };
