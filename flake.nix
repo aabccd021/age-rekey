@@ -44,10 +44,50 @@
       packages = {
         default = pkgs.writeShellApplication {
           name = "age-rekey";
-          runtimeInputs = [ ];
+          runtimeInputs = with pkgs; [
+            age
+            coreutils # base64, sha256sum, cut, head, tr, mktemp
+            gnugrep # grep
+            unixtools.xxd # xxd for hex conversion
+          ];
           text = builtins.readFile ./age-rekey.sh;
         };
         formatting = treefmtEval.config.build.check self;
+        test-check-consistent = pkgs.runCommand "test-check-consistent" {
+          nativeBuildInputs = [
+            packages.default
+            pkgs.age
+            pkgs.openssh
+          ];
+        } (builtins.readFile ./test-check-consistent.sh);
+        test-check-mismatch = pkgs.runCommand "test-check-mismatch" {
+          nativeBuildInputs = [
+            packages.default
+            pkgs.age
+            pkgs.openssh
+          ];
+        } (builtins.readFile ./test-check-mismatch.sh);
+        test-rekey-add-recipient = pkgs.runCommand "test-rekey-add-recipient" {
+          nativeBuildInputs = [
+            packages.default
+            pkgs.age
+            pkgs.openssh
+          ];
+        } (builtins.readFile ./test-rekey-add-recipient.sh);
+        test-rekey-remove-recipient = pkgs.runCommand "test-rekey-remove-recipient" {
+          nativeBuildInputs = [
+            packages.default
+            pkgs.age
+            pkgs.openssh
+          ];
+        } (builtins.readFile ./test-rekey-remove-recipient.sh);
+        test-rekey-armor = pkgs.runCommand "test-rekey-armor" {
+          nativeBuildInputs = [
+            packages.default
+            pkgs.age
+            pkgs.openssh
+          ];
+        } (builtins.readFile ./test-rekey-armor.sh);
       };
 
     in
