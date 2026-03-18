@@ -1,43 +1,21 @@
 #!/bin/sh
 set -eu
 
-check_mode=false
 identity=""
-
-# Parse arguments
-while [ $# -gt 0 ]; do
-  case "$1" in
-  --check)
-    check_mode=true
-    shift
-    ;;
-  -i)
-    identity="$2"
-    shift 2
-    ;;
-  --)
-    shift
-    break
-    ;;
-  -*)
-    echo "Unknown option: $1" >&2
-    exit 1
-    ;;
-  *)
-    break
-    ;;
-  esac
-done
+if [ "${1:-}" = "-i" ]; then
+  identity="$2"
+  shift 2
+fi
 
 if [ $# -eq 0 ]; then
-  echo "Usage: age-rekey [--check] [-i identity] <file.age>..." >&2
+  echo "Usage: age-rekey [-i identity] <file.age>..." >&2
   exit 1
 fi
 
 expected_fp=$(mktemp)
 actual_fp=$(mktemp)
-tmpfile=$(umask 077 && mktemp)
-trap 'rm -f "$expected_fp" "$actual_fp" "$tmpfile"' EXIT
+plain_secret=$(umask 077 && mktemp)
+trap 'rm -f "$expected_fp" "$actual_fp" "$plain_secret"' EXIT
 
 for age_file in "$@"; do
   recipients_file="${age_file}.recipients.txt"
@@ -71,7 +49,8 @@ for age_file in "$@"; do
     continue
   fi
 
-  if [ "$check_mode" = true ]; then
+  # No identity provided = check mode, exit on mismatch
+  if [ -z "$identity" ]; then
     echo "MISMATCH: $age_file" >&2
     exit 1
   fi
@@ -79,11 +58,11 @@ for age_file in "$@"; do
   # Rekey: decrypt and re-encrypt with new recipients
   echo "Rekeying: $age_file" >&2
 
-  age -d -i "$identity" "$age_file" >"$tmpfile"
+  age -d -i "$identity" "$age_file" >"$plain_secret"
 
   armor_flag=""
   if [ "$is_armored" = true ]; then
     armor_flag="-a"
   fi
-  age -e $armor_flag -R "$recipients_file" -o "$age_file" "$tmpfile"
+  age -e $armor_flag -R "$recipients_file" -o "$age_file" "$plain_secret"
 done
