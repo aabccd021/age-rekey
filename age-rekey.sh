@@ -46,13 +46,8 @@ for age_file in "$@"; do
     is_armored=true
   fi
 
-  expected_fp=$(mktemp)
   actual_fp=$(mktemp)
-  trap 'rm -f "$expected_fp" "$actual_fp"' EXIT
-
-  while IFS= read -r pubkey_line; do
-    echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | xxd -r -p | base64 | tr -d '='
-  done <"$recipients_file" | sort >"$expected_fp"
+  trap 'rm -f "$actual_fp"' EXIT
 
   age_binary=$(cat "$age_file")
   if [ "$is_armored" = true ]; then
@@ -60,23 +55,37 @@ for age_file in "$@"; do
   fi
   echo "$age_binary" | grep -ao '^-> ssh-ed25519 [^ ]*' | cut -d' ' -f3 | sort >"$actual_fp"
 
-  if diff -q "$expected_fp" "$actual_fp" >/dev/null; then
+  expected_count=$(wc -l <"$recipients_file")
+  actual_count=$(wc -l <"$actual_fp")
+
+  mismatch=false
+  if [ "$expected_count" != "$actual_count" ]; then
+    mismatch=true
+  else
+    while IFS= read -r pubkey_line; do
+      fp=$(echo "$pubkey_line" | cut -d' ' -f2 | base64 -d | sha256sum | head -c 8 | xxd -r -p | base64 | tr -d '=')
+      if ! grep -qx "$fp" "$actual_fp"; then
+        mismatch=true
+        break
+      fi
+    done <"$recipients_file"
+  fi
+
+  if [ "$mismatch" = false ]; then
     echo "OK: $age_file"
-    rm -f "$expected_fp" "$actual_fp"
+    rm -f "$actual_fp"
     continue
   fi
 
   if [ "$check_mode" = true ]; then
     echo "MISMATCH: $age_file" >&2
-    echo "  Expected: $(tr '\n' ' ' <"$expected_fp")" >&2
-    echo "  Actual:   $(tr '\n' ' ' <"$actual_fp")" >&2
     exit 1
   fi
 
   echo "Rekeying: $age_file"
 
   tmpfile=$(umask 077 && mktemp)
-  trap 'rm -f "$expected_fp" "$actual_fp" "$tmpfile"' EXIT
+  trap 'rm -f "$actual_fp" "$tmpfile"' EXIT
 
   age -d -i "$identity" "$age_file" >"$tmpfile"
 
@@ -86,5 +95,5 @@ for age_file in "$@"; do
   fi
   age -e $armor_flag -R "$recipients_file" -o "$age_file" "$tmpfile"
 
-  rm -f "$expected_fp" "$actual_fp" "$tmpfile"
+  rm -f "$actual_fp" "$tmpfile"
 done
