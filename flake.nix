@@ -28,12 +28,26 @@
           text = builtins.readFile ./age-rekey.sh;
         };
         formatting = treefmtEval.config.build.check self;
-        formatter = formatter;
+      };
+
+      checks = {
+        all = pkgs.linkFarm "all" (
+          nixpkgs.lib.mapAttrsToList (name: drv: {
+            name = "packages-${name}";
+            path = drv;
+          }) packages
+          ++ [
+            {
+              name = "formatter-treefmt";
+              path = formatter;
+            }
+          ]
+        );
       };
     in
     {
       packages.x86_64-linux = packages;
-      checks.x86_64-linux = packages;
+      checks.x86_64-linux = checks;
       formatter.x86_64-linux = formatter;
     };
 }
