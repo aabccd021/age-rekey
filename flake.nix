@@ -94,6 +94,13 @@
             pkgs.openssh
           ];
         } (builtins.readFile ./test-check-different-key.sh);
+        test-skip-unchanged = pkgs.runCommand "test-skip-unchanged" {
+          nativeBuildInputs = [
+            packages.default
+            pkgs.age
+            pkgs.openssh
+          ];
+        } (builtins.readFile ./test-skip-unchanged.sh);
       };
 
     in
